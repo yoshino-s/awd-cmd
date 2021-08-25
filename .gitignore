@@ -1,0 +1,4 @@
+__pycache__
+*.tar.gz
+backup.*
+*.log
