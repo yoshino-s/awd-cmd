@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from os import unlink
-from re import DEBUG
 
 from tabulate import tabulate
 import csv
@@ -9,8 +8,14 @@ from typing import List
 import click
 import paramiko
 import subprocess
+import os
+from datetime import datetime
+from os.path import join
 
 client: SSHClient
+base = "data/"
+directory: str = "default/"
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
 
 @click.group()
@@ -19,13 +24,17 @@ client: SSHClient
 @click.option('-u', '--user', help='user to connect as', default='root')
 @click.option('-P', '--password', help='password to use', required=True)
 def awd(ip: str, port: int, user: str, password: str):
-    global client
+    global client, directory
     client = SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(hostname=ip, port=port, username=user, password=password)
+    directory = f"{user}_{ip}_{port}/"
+    directory = os.path.join(base, directory)
+    os.makedirs(directory, exist_ok=True)
+
 
 @awd.command("interactive")
-@click.argument('cmd', default="exec bash && cd /var/www/html")
+@click.argument('cmd', default="exec bash; cd /var/www/html")
 def interactive(cmd):
     """Runs the interactive shell"""
     client.open_shell(cmd+"\n")
@@ -58,8 +67,9 @@ def backup(ctx):
 @backup.command("html")
 def backup_html():
     """Backup the html files"""
-    client.run('cd /tmp && tar -cvf backup.tar.gz /var/www/html')
-    client.pull('/tmp/backup.tar.gz', 'backup.tar.gz')
+    name = timestamp + "-backup.tar.gz"
+    client.run(f'cd /tmp; tar -cvf backup.tar.gz /var/www/html; cp backup.tar.gz {name}')
+    client.pull(f'/tmp/{name}', join(directory, name))
 
 
 @backup.command("db")
@@ -68,9 +78,10 @@ def backup_html():
 @click.option('-d', '--database', help='database to backup', default='awd')
 def backup_db(user, password, database):
     """Backup the database"""
+    name = timestamp + "-backup.sql"
     client.run(
-        f'cd /tmp && mysqldump {database} -u{user} -p{password} > backup.sql')
-    client.pull(f'/tmp/backup.sql', 'backup.sql')
+        f'cd /tmp; mysqldump {database} -u{user} -p{password} > backup.sql; cp backup.sql {name}')
+    client.pull(f'/tmp/{name}', join(directory, name))
 
 
 @awd.group(invoke_without_command=True)
@@ -85,7 +96,7 @@ def recovery(ctx):
 def recovery_html():
     """Recover the html files"""
     client.run(
-        f'cd /tmp && tar -xvf backup.tar.gz && rm -rf /var/www/html/* && cp -r /tmp/var/www/html/* /var/www/html/ && chmod -R 777 /var/www/html/')
+        f'cd /tmp; tar -xvf backup.tar.gz; rm -rf /var/www/html/*; cp -r /tmp/var/www/html/* /var/www/html/; chmod -R 777 /var/www/html/')
 
 
 @recovery.command("db")
@@ -98,7 +109,7 @@ def recovery_db(user, password, database):
     client.run(
         f"mysql -u{user} -p{user} -e 'create database if not exists {database}'")
     client.run(
-        f'cd /tmp && mysql {database} -u{user} -p{password} < backup.sql')
+        f'cd /tmp; mysql {database} -u{user} -p{password} < backup.sql')
 
 
 @awd.group(invoke_without_command=True)
@@ -115,14 +126,16 @@ def waf_push():
     subprocess.check_call(['tar', '-cvf', 'waf.tar.gz', 'waf'])
     client.push(f'waf.tar.gz', '/tmp/waf.tar.gz')
     client.run(
-        f'cd /tmp && tar -xvf waf.tar.gz && mkdir -p /tmp/waf/log/ && chmod -R 777 /tmp/waf/log')
+        f'cd /tmp; tar -xvf waf.tar.gz; mkdir -p /tmp/waf/log/; chmod -R 777 /tmp/waf/log')
 
 
 @waf.command("log")
 def waf_log():
-    client.run('cd /tmp/waf && tar -cvf log.tar.gz log')
-    client.pull(f'/tmp/waf/log.tar.gz', 'log.tar.gz')
-    subprocess.check_call(['tar', '-xvf', 'log.tar.gz'])
+    name = join(directory, 'log.tar.gz')
+    client.run('cd /tmp/waf; tar -cvf log.tar.gz log')
+    client.pull(f'/tmp/waf/log.tar.gz', name)
+    subprocess.check_call(['tar', '-xf', 'log.tar.gz'], cwd=directory)
+    unlink(name)
 
 
 @waf.command("watchbird")
@@ -162,17 +175,19 @@ def python():
 @python.command("push")
 def python_push():
     client.push("cpython.tar.gz", "/tmp/cpython.tar.gz")
-    client.run("cd /tmp && tar -xvf cpython.tar.gz")
+    client.run("cd /tmp; tar -xvf cpython.tar.gz")
 
 
 @python.command("run")
 def python_run():
     client.open_shell("/tmp/cpython/python\n")
 
+
 @python.command("watch")
 def python_watch():
     client.push("monitor/watch.py", "/tmp/watch.py")
-    client.open_shell("cd /var/www/html && /tmp/cpython/python /tmp/watch.py\n")
+    client.open_shell(
+        "cd /var/www/html; /tmp/cpython/python /tmp/watch.py\n")
 
 
 @awd.group()
@@ -184,7 +199,7 @@ def hm():
 @hm.command("push")
 def hm_push():
     client.push("hm.tar.gz", "/tmp/hm.tar.gz")
-    client.run("cd /tmp && tar -xvf hm.tar.gz")
+    client.run("cd /tmp; tar -xvf hm.tar.gz")
 
 
 @hm.command("run")
@@ -202,14 +217,16 @@ def hm_scan():
         print(tabulate(reader, headers="firstrow"))
     unlink("result.csv")
 
+
 @hm.command("deepscan")
 def hm_deepscan():
+    name = timestamp + "-hm_result.csv"
+    p = join(directory, name)
     client.run("/tmp/hm/hm deepscan /var/www/html")
-    client.pull("/tmp/hm/result.csv", "result.csv")
-    with open('result.csv') as inf:
+    client.pull("/tmp/hm/result.csv", p)
+    with open(p) as inf:
         reader = csv.reader(inf)
         print(tabulate(reader, headers="firstrow"))
-    unlink("result.csv")
 
 
 if __name__ == '__main__':

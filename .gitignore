@@ -1,7 +1,3 @@
+!.gitkeep
 __pycache__
-*.tar.gz
-backup.*
-*.log
-log
-backup
-!cpython.tar.gz
+data
