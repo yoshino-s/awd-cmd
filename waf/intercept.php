@@ -9,20 +9,15 @@ class Intercept
     private $method = "UNKNOWN";
     private $protocol = "UNKNOWN";
     private $headers = array();
-    /**
-     * @var string
-     */
-    private $uuid;
 
     function __construct()
     {
         $this->retrieve_headers();
         $this->retrieveBody();
         $req = $this->requestContent();
-        $this->uuid = uniqid();
         $ip = $_SERVER['REMOTE_ADDR'];
         $port = $_SERVER['REMOTE_PORT'];
-        $this->writeLog("-----------------------\nFrom: $ip:$port;\n$this->uuid\n$req\n");
+        $this->writeLog("-----------------------\nFrom: $ip:$port;\n$req\n");
         ob_start(function ($i) {
             return $this->responseCallback($i);
         });
@@ -35,7 +30,10 @@ class Intercept
     private function responseCallback($content)
     {
         $res = $this->responseContent($content);
-        $this->writeLog("-----------------------\n$this->uuid\n$res\n");
+        $this->writeLog("-----------------------\n$res\n");
+        if(strpos($res, @file_get_contents("/flag"))!==false){
+            $this->writeLog("^^^^^^^^^^^^^^^^^^^^^^^\nFLAG FOUND\n");
+        }
         return $content;
     }
 
