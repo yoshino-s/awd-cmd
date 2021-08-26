@@ -45,7 +45,7 @@ pip install -r requirements.txt
 ### 上传
 
 ```sh
-./awd.py -i ip -p port -P password -u user waf psuh
+./awd.py -i ip -p port -P password -u user waf push
 ```
 
 ### watchbird

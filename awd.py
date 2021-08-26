@@ -68,7 +68,7 @@ def backup(ctx):
 def backup_html():
     """Backup the html files"""
     name = timestamp + "-backup.tar.gz"
-    client.run(f'cd /tmp; tar -cvf backup.tar.gz /var/www/html; cp backup.tar.gz {name}')
+    client.run(f'cd /tmp; tar -czvf backup.tar.gz /var/www/html; cp backup.tar.gz {name}')
     client.pull(f'/tmp/{name}', join(directory, name))
 
 
@@ -123,7 +123,7 @@ def waf(ctx):
 @waf.command("push")
 def waf_push():
     """Push the waf files"""
-    subprocess.check_call(['tar', '-cvf', 'waf.tar.gz', 'waf'])
+    subprocess.check_call(['tar', '-czvf', 'waf.tar.gz', 'waf'])
     client.push(f'waf.tar.gz', '/tmp/waf.tar.gz')
     client.run(
         f'cd /tmp; tar -xvf waf.tar.gz; mkdir -p /tmp/waf/log/; chmod -R 777 /tmp/waf/log')
@@ -132,7 +132,7 @@ def waf_push():
 @waf.command("log")
 def waf_log():
     name = join(directory, 'log.tar.gz')
-    client.run('cd /tmp/waf; tar -cvf log.tar.gz log')
+    client.run('cd /tmp/waf; tar -czvf log.tar.gz log')
     client.pull(f'/tmp/waf/log.tar.gz', name)
     subprocess.check_call(['tar', '-xf', 'log.tar.gz'], cwd=directory)
     unlink(name)
@@ -210,12 +210,13 @@ def hm_run(args: List[str]):
 
 @hm.command("scan")
 def hm_scan():
+    name = timestamp + "-hm_result.csv"
+    p = join(directory, name)
     client.run("/tmp/hm/hm scan /var/www/html")
-    client.pull("/tmp/hm/result.csv", "result.csv")
-    with open('result.csv') as inf:
+    client.pull("/tmp/hm/result.csv", p)
+    with open(p) as inf:
         reader = csv.reader(inf)
         print(tabulate(reader, headers="firstrow"))
-    unlink("result.csv")
 
 
 @hm.command("deepscan")
