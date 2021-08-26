@@ -34,7 +34,7 @@ def awd(ip: str, port: int, user: str, password: str):
 
 
 @awd.command("interactive")
-@click.argument('cmd', default="exec bash; cd /var/www/html")
+@click.argument('cmd', default="exec bash\ncd /var/www/html")
 def interactive(cmd):
     """Runs the interactive shell"""
     client.open_shell(cmd+"\n")
