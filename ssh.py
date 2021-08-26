@@ -9,11 +9,9 @@ import termios
 import tty
 from itertools import zip_longest
 
-from paramiko import sftp
-
 
 class SSHClient(paramiko.SSHClient):
-    def open_shell(self: paramiko.SSHClient, remote_name='SSH server'):
+    def open_shell(self: paramiko.SSHClient, remote_name='SSH server', start_up = None):
         oldtty_attrs = termios.tcgetattr(sys.stdin)
         channel = self.invoke_shell()
 
@@ -26,7 +24,8 @@ class SSHClient(paramiko.SSHClient):
                                    height=int(tty_height))
             except paramiko.SSHException:
                 pass
-
+        if start_up:
+            channel.send(start_up)
         try:
             stdin_fileno = sys.stdin.fileno()
             tty.setraw(stdin_fileno)
@@ -86,6 +85,7 @@ class SSHClient(paramiko.SSHClient):
                     cb.pre = a
                 cb.pre = 0
                 sftp.get(remote_path, local_path, cb)
+
     def push(self, local_path, remote_path):
         with self.open_sftp() as sftp:
             size = os.lstat(local_path).st_size

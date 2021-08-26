@@ -50,7 +50,7 @@ pip install -r requirements.txt
 ### watchbird
 
 ```sh
-./awd.py -i ip -p port -P password -u user waf watchbird install
+./awd.py -i ip -p port -P password -u user waf watchbird install -p birdwatch
 ./awd.py -i ip -p port -P password -u user waf watchbird uninstall
 ```
 

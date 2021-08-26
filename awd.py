@@ -145,6 +145,20 @@ def intercept(action, log):
         client.run(
             'php /tmp/waf/waf.php uninstall /var/www/html/ /tmp/waf/intercept.php')
 
+@awd.group()
+def python():
+    """python utils"""
+    pass
+
+@python.command("push")
+def push():
+    client.push("cpython.tar.gz", "/tmp/cpython.tar.gz")
+    client.run("cd /tmp && tar -xvf cpython.tar.gz")
+
+@python.command("run")
+def run_python():
+    client.open_shell(start_up="/tmp/cpython/python\n")
+
 
 if __name__ == '__main__':
     awd()
