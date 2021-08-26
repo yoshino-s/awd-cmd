@@ -1,4 +1,12 @@
 # awd.py
+## 安装
+
+Python3.9
+
+```sh
+pip install -r requirements.txt
+```
+
 
 ```sh
 ./awd.py -i ip -p port -P password -u user
@@ -21,14 +29,14 @@
 
 ```sh
 ./awd.py -i ip -p port -P password -u user backup html
-./awd.py -i ip -p port -P password -u user backup db
+./awd.py -i ip -p port -P password -u user backup db -u root -p root -d ctf
 ```
 
 ## 恢复
 
 ```sh
 ./awd.py -i ip -p port -P password -u user recovery html
-./awd.py -i ip -p port -P password -u user recovery db
+./awd.py -i ip -p port -P password -u user recovery db -u root -p root -d ctf
 ```
 
 ## waf

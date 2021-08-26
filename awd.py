@@ -6,7 +6,6 @@ from ssh import SSHClient
 from typing import Optional
 import click
 import paramiko
-from pydantic import BaseModel
 import subprocess
 
 client: SSHClient
@@ -83,7 +82,7 @@ def recovery(ctx):
 def html_recovery():
     """Recover the html files"""
     client.run(
-        f'cd /tmp && tar -xvf backup.tar.gz && rm -rf /var/www/html/* && cp -r /tmp/var/www/html/* /var/www/html/')
+        f'cd /tmp && tar -xvf backup.tar.gz && rm -rf /var/www/html/* && cp -r /tmp/var/www/html/* /var/www/html/ && chmod -R 777 /var/www/html/')
 
 
 @recovery.command("db")
@@ -93,6 +92,7 @@ def html_recovery():
 def db_recovery(user, password, database):
     """Backup the database"""
     sftp = client.open_sftp()
+    client.run(f"mysql -u{user} -p{user} -e 'create database if not exists {database}'")
     client.run(
         f'cd /tmp && mysql {database} -u{user} -p{password} < backup.sql')
 
