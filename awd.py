@@ -120,10 +120,13 @@ def log():
 
 
 @waf.command()
+@click.option('-p', '--password', default='birdwatch')
 @click.argument('action', type=click.Choice(['install', 'uninstall']))
-def watchbird(action: str):
+def watchbird(password, action: str):
     """manage watchbird"""
     if action == 'install':
+        client.run(
+            'sed -i \'s|birdwatch|'+password+'|\' /tmp/waf/watchbird.php')
         client.run('php /tmp/waf/watchbird.php --install /var/www/html')
     else:
         client.run('php /tmp/waf/watchbird.php --uninstall /var/www/html')
