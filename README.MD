@@ -16,6 +16,7 @@ pip install -r requirements.txt
 
 ```sh
 ./awd.py -i ip -p port -P password -u user interactive
+./awd.py -i ip -p port -P password -u user interactive 'ls /'
 ```
 
 ## 传文件
@@ -65,4 +66,40 @@ pip install -r requirements.txt
 
 ```sh
 ./awd.py -i ip -p port -P password -u user waf log
+```
+
+
+## python工具
+
+### 上传
+
+```sh
+./awd.py -i ip -p port -P password -u user python push
+```
+
+### repl
+
+```sh
+./awd.py -i ip -p port -P password -u user python run
+```
+
+### 文件监控
+
+```sh
+./awd.py -i ip -p port -P password -u user python watch
+```
+
+## hm webshell扫描
+
+### 上传
+
+```sh
+./awd.py -i ip -p port -P password -u user hm push
+```
+
+### 扫描
+
+```sh
+./awd.py -i ip -p port -P password -u user hm scan
+./awd.py -i ip -p port -P password -u user hm deepscan
 ```

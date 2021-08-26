@@ -11,7 +11,7 @@ from itertools import zip_longest
 
 
 class SSHClient(paramiko.SSHClient):
-    def open_shell(self: paramiko.SSHClient, remote_name='SSH server', start_up = None):
+    def open_shell(self: paramiko.SSHClient, start_up = None):
         oldtty_attrs = termios.tcgetattr(sys.stdin)
         channel = self.invoke_shell()
 

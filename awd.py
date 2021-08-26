@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+from os import unlink
 from re import DEBUG
 
-from paramiko import sftp
+from tabulate import tabulate
+import csv
 from ssh import SSHClient
-from typing import Optional
+from typing import List
 import click
 import paramiko
 import subprocess
@@ -17,29 +19,30 @@ client: SSHClient
 @click.option('-u', '--user', help='user to connect as', default='root')
 @click.option('-P', '--password', help='password to use', required=True)
 def awd(ip: str, port: int, user: str, password: str):
-    global client, sftp
+    global client
     client = SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(hostname=ip, port=port, username=user, password=password)
 
-
-@awd.command()
-def interactive():
+@awd.command("interactive")
+@click.argument('cmd', default="exec bash && cd /var/www/html")
+def interactive(cmd):
     """Runs the interactive shell"""
-    client.open_shell()
+    client.open_shell(cmd+"\n")
 
 
 @awd.command("push")
 @click.argument('local_path', type=click.Path(exists=True))
 @click.argument('remote_path', type=click.Path())
-def push_file(local_path: str, remote_path: str):
+def push(local_path: str, remote_path: str):
     """push a file to the remote server"""
     client.push(local_path, remote_path)
+
 
 @awd.command("pull")
 @click.argument('remote_path', type=click.Path())
 @click.argument('local_path', type=click.Path(exists=True))
-def pull_file(local_path: str, remote_path: str):
+def pull(local_path: str, remote_path: str):
     """push a file to the remote server"""
     client.pull(local_path, remote_path)
 
@@ -49,21 +52,21 @@ def pull_file(local_path: str, remote_path: str):
 def backup(ctx):
     """backup files"""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(html)
+        ctx.invoke(backup_html)
 
 
-@backup.command()
-def html():
+@backup.command("html")
+def backup_html():
     """Backup the html files"""
     client.run('cd /tmp && tar -cvf backup.tar.gz /var/www/html')
     client.pull('/tmp/backup.tar.gz', 'backup.tar.gz')
 
 
-@backup.command()
+@backup.command("db")
 @click.option('-u', '--user', help='user to connect as', default='root')
 @click.option('-p', '--password', help='password to use', default='root')
 @click.option('-d', '--database', help='database to backup', default='awd')
-def db(user, password, database):
+def backup_db(user, password, database):
     """Backup the database"""
     client.run(
         f'cd /tmp && mysqldump {database} -u{user} -p{password} > backup.sql')
@@ -75,11 +78,11 @@ def db(user, password, database):
 def recovery(ctx):
     """recovery files"""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(html_recovery)
+        ctx.invoke(recovery_html)
 
 
 @recovery.command("html")
-def html_recovery():
+def recovery_html():
     """Recover the html files"""
     client.run(
         f'cd /tmp && tar -xvf backup.tar.gz && rm -rf /var/www/html/* && cp -r /tmp/var/www/html/* /var/www/html/ && chmod -R 777 /var/www/html/')
@@ -89,10 +92,11 @@ def html_recovery():
 @click.option('-u', '--user', help='user to connect as', default='root')
 @click.option('-p', '--password', help='password to use', default='root')
 @click.option('-d', '--database', help='database to backup', default='awd')
-def db_recovery(user, password, database):
+def recovery_db(user, password, database):
     """Backup the database"""
     sftp = client.open_sftp()
-    client.run(f"mysql -u{user} -p{user} -e 'create database if not exists {database}'")
+    client.run(
+        f"mysql -u{user} -p{user} -e 'create database if not exists {database}'")
     client.run(
         f'cd /tmp && mysql {database} -u{user} -p{password} < backup.sql')
 
@@ -102,27 +106,29 @@ def db_recovery(user, password, database):
 def waf(ctx):
     """add waf"""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(push)
+        ctx.invoke(waf_push)
 
 
-@waf.command()
-def push():
+@waf.command("push")
+def waf_push():
     """Push the waf files"""
     subprocess.check_call(['tar', '-cvf', 'waf.tar.gz', 'waf'])
     client.push(f'waf.tar.gz', '/tmp/waf.tar.gz')
-    client.run(f'cd /tmp && tar -xvf waf.tar.gz && mkdir -p /tmp/waf/log/ && chmod -R 777 /tmp/waf/log')
+    client.run(
+        f'cd /tmp && tar -xvf waf.tar.gz && mkdir -p /tmp/waf/log/ && chmod -R 777 /tmp/waf/log')
 
-@waf.command()
-def log():
+
+@waf.command("log")
+def waf_log():
     client.run('cd /tmp/waf && tar -cvf log.tar.gz log')
     client.pull(f'/tmp/waf/log.tar.gz', 'log.tar.gz')
     subprocess.check_call(['tar', '-xvf', 'log.tar.gz'])
 
 
-@waf.command()
+@waf.command("watchbird")
 @click.option('-p', '--password', default='birdwatch')
 @click.argument('action', type=click.Choice(['install', 'uninstall']))
-def watchbird(password, action: str):
+def waf_watchbird(password, action: str):
     """manage watchbird"""
     if action == 'install':
         client.run(
@@ -132,32 +138,78 @@ def watchbird(password, action: str):
         client.run('php /tmp/waf/watchbird.php --uninstall /var/www/html')
 
 
-@waf.command()
+@waf.command("intercept")
 @click.option('-l', '--log', default='/tmp/waf/log/log-{time}.log')
 @click.argument('action', type=click.Choice(['install', 'uninstall']))
-def intercept(action, log):
+def waf_intercept(action, log):
     """manage intercept"""
     if action == 'install':
         client.run(
             'sed -i \'s|/tmp/log-{time}\\.log|'+log+'|\' /tmp/waf/intercept.php')
-        client.run('php /tmp/waf/waf.php install /var/www/html/ /tmp/waf/intercept.php')
+        client.run(
+            'php /tmp/waf/waf.php install /var/www/html/ /tmp/waf/intercept.php')
     else:
         client.run(
             'php /tmp/waf/waf.php uninstall /var/www/html/ /tmp/waf/intercept.php')
+
 
 @awd.group()
 def python():
     """python utils"""
     pass
 
+
 @python.command("push")
-def push():
+def python_push():
     client.push("cpython.tar.gz", "/tmp/cpython.tar.gz")
     client.run("cd /tmp && tar -xvf cpython.tar.gz")
 
+
 @python.command("run")
-def run_python():
-    client.open_shell(start_up="/tmp/cpython/python\n")
+def python_run():
+    client.open_shell("/tmp/cpython/python\n")
+
+@python.command("watch")
+def python_watch():
+    client.push("monitor/watch.py", "/tmp/watch.py")
+    client.open_shell("cd /var/www/html && /tmp/cpython/python /tmp/watch.py\n")
+
+
+@awd.group()
+def hm():
+    """hm utils"""
+    pass
+
+
+@hm.command("push")
+def hm_push():
+    client.push("hm.tar.gz", "/tmp/hm.tar.gz")
+    client.run("cd /tmp && tar -xvf hm.tar.gz")
+
+
+@hm.command("run")
+@click.argument('args', nargs=-1)
+def hm_run(args: List[str]):
+    client.run(f"/tmp/hm/hm {' '.join(args)}")
+
+
+@hm.command("scan")
+def hm_scan():
+    client.run("/tmp/hm/hm scan /var/www/html")
+    client.pull("/tmp/hm/result.csv", "result.csv")
+    with open('result.csv') as inf:
+        reader = csv.reader(inf)
+        print(tabulate(reader, headers="firstrow"))
+    unlink("result.csv")
+
+@hm.command("deepscan")
+def hm_deepscan():
+    client.run("/tmp/hm/hm deepscan /var/www/html")
+    client.pull("/tmp/hm/result.csv", "result.csv")
+    with open('result.csv') as inf:
+        reader = csv.reader(inf)
+        print(tabulate(reader, headers="firstrow"))
+    unlink("result.csv")
 
 
 if __name__ == '__main__':
