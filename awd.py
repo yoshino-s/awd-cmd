@@ -9,6 +9,7 @@ import click
 import paramiko
 import subprocess
 import os
+import tarfile
 from datetime import datetime
 from os.path import join
 
@@ -123,7 +124,8 @@ def waf(ctx):
 @waf.command("push")
 def waf_push():
     """Push the waf files"""
-    subprocess.check_call(['tar', '-czvf', 'waf.tar.gz', 'waf'])
+    with tarfile.open("waf.tar.gz", "w:gz") as tar:
+        tar.add("waf/")
     client.push(f'waf.tar.gz', '/tmp/waf.tar.gz')
     client.run(
         f'cd /tmp; tar -xvf waf.tar.gz; mkdir -p /tmp/waf/log/; chmod -R 777 /tmp/waf/log')
@@ -134,7 +136,8 @@ def waf_log():
     name = join(directory, 'log.tar.gz')
     client.run('cd /tmp/waf; tar -czvf log.tar.gz log')
     client.pull(f'/tmp/waf/log.tar.gz', name)
-    subprocess.check_call(['tar', '-xf', 'log.tar.gz'], cwd=directory)
+    with tarfile.open(name, 'r:gz') as tar:
+        tar.extractall(directory)
     unlink(name)
 
 

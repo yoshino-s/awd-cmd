@@ -2,22 +2,19 @@ import click
 import paramiko
 import sys
 import os
-import subprocess
 import select
 import socket
-import termios
 import tty
 from itertools import zip_longest
 
 
 class SSHClient(paramiko.SSHClient):
     def open_shell(self: paramiko.SSHClient, start_up = None):
-        oldtty_attrs = termios.tcgetattr(sys.stdin)
         channel = self.invoke_shell()
 
         def resize_pty():
-            tty_height, tty_width = subprocess.check_output(
-                ['stty', 'size']).split()
+            size = os.get_terminal_size()
+            tty_height, tty_width = size.lines, size.columns
 
             try:
                 channel.resize_pty(width=int(tty_width),
@@ -58,7 +55,7 @@ class SSHClient(paramiko.SSHClient):
                         channel.send(char)
             channel.shutdown(2)
         finally:
-            termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, oldtty_attrs)
+            pass
 
     def run(self: paramiko.SSHClient, command):
         stdin, stdout, stderr = self.exec_command(
@@ -79,7 +76,7 @@ class SSHClient(paramiko.SSHClient):
     def pull(self: paramiko.SSHClient, remote_path, local_path):
         with self.open_sftp() as sftp:
             size = sftp.lstat(remote_path).st_size
-            with click.progressbar(label='scp pull backup', length=size, show_pos=True) as bar:
+            with click.progressbar(label='scp pull', length=size, show_pos=True) as bar:
                 def cb(a, b):
                     bar.update(a - cb.pre)
                     cb.pre = a
@@ -89,7 +86,7 @@ class SSHClient(paramiko.SSHClient):
     def push(self, local_path, remote_path):
         with self.open_sftp() as sftp:
             size = os.lstat(local_path).st_size
-            with click.progressbar(label='scp pull backup', length=size, show_pos=True) as bar:
+            with click.progressbar(label='scp push', length=size, show_pos=True) as bar:
                 def cb(a, b):
                     bar.update(a - cb.pre)
                     cb.pre = a
